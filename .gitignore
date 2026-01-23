@@ -1,0 +1,55 @@
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+
+# 内存转储文件
+MemoryCaptures/
+
+# 资源包提取目录 (由某些插件产生)
+/[Aa]ssets/AssetStoreTools*
+
+# 自动生成的工程文件 (由 Visual Studio 或 Rider 生成)
+# 如果你希望在仓库中保留这些文件，可以注释掉以下几行
+ExportedObj/
+.consulo/
+.gradle/
+.idea/
+.vs/
+.vscode/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svclog
+*.pdb
+*.opendb
+*.VC.db
+
+# 编译生成的程序
+*.dll
+*.exe
+*.zip
+*.apk
+*.unitypackage
+*.msi
+
+# 日志文件
+sysinfo.txt
+
+# Crashlytics 产生的临时文件
+crashlytics-build.properties
+
+# macOS 系统生成的隐藏文件
+.DS_Store
+
+# 这里的排除项是为了保留某些特殊的文件夹（如果需要）
+!/[Aa]ssets/**/*.meta
