@@ -1,12 +1,12 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class ConveyorLogic : MonoBehaviour
 {
-    public Vector2 moveDirection = new Vector2(0, 1); // 对应 (X, Z) 逻辑方向
+    // public Vector2 moveDirection = new Vector2(0, 1); // 对应 (X, Z) 逻辑方向
     public float moveSpeed = 2.0f; // 建议与玩家滚动速度一致
     public bool isActive = true; // 机关开关状态
+    public Transform forwardPoint; // 前方检测点
 
     public float alignmentThreshold = 0.4f; // 中心点触发距离
 
@@ -21,28 +21,10 @@ public class ConveyorLogic : MonoBehaviour
             // 关键：只有当玩家还没被其他传送带“接管”时，才启动新的传送链
             if (player != null && !player.isBeingTransported)
             {
+                Debug.Log("玩家进入传送带: " + gameObject.name);
                 StartCoroutine(ContinuousTransport(player));
             }
         }
-    }
-
-    private (Vector3 pos1, Vector3 pos2, Vector3 pos3) PrepareTransport(Player player)
-    {
-        // 预处理逻辑（如有需要）
-        // 1. 锁定玩家操作
-        player.isBeingTransported = true; // 新增状态位，防止重复触发协程
-        player.isControlLocked = true;
-
-        // 2. 坐标校准：将玩家平滑拉到传送带中心线上
-        Vector3 entryPos = player.transform.position;
-        Vector3 centerLinePos = new Vector3(transform.position.x, entryPos.y, transform.position.z);
-
-        // 3. 计算目标格子中心位置
-        Vector3 nextGroundPos =
-            transform.position + new Vector3(moveDirection.x, 0, moveDirection.y);
-        Vector3 targetPos = new Vector3(nextGroundPos.x, entryPos.y, nextGroundPos.z);
-
-        return (centerLinePos, targetPos, nextGroundPos);
     }
 
     private IEnumerator ContinuousTransport(Player player)
@@ -58,18 +40,33 @@ public class ConveyorLogic : MonoBehaviour
             if (logic == null || !logic.isActive)
                 break;
 
+            Debug.Log("当前传送带: " + currentConveyor.name);
+
             // 1. 坐标校准
             Vector3 entryPos = player.transform.position; // 玩家进入传送带时的位置
             Vector3 centerLinePos = new Vector3(
-                transform.position.x,
+                currentConveyor.transform.position.x,
                 entryPos.y,
-                transform.position.z
+                currentConveyor.transform.position.z
             );
 
             // 2. 计算目标格子中心位置
+            // Vector3 forwardMoveDir = currentConveyor.transform.forward;
+            Vector3 forwardMoveDir = forwardPoint.position - currentConveyor.transform.position;
+            Debug.Log("1: " + forwardPoint.position + " 2: " + currentConveyor.transform.position);
+            forwardMoveDir.y = 0;
+            forwardMoveDir.Normalize();
+            // Vector2 currentDir = logic.moveDirection;
+            Vector2 currentDir = forwardMoveDir;
+
+            Debug.Log("传送方向: " + currentDir + ", 前方: " + forwardMoveDir);
+            Vector3 targetPos =
+                currentConveyor.transform.position
+                + new Vector3(currentDir.x, entryPos.y, currentDir.y); // 玩家目标位置
             Vector3 nextGroundPos =
-                transform.position + new Vector3(moveDirection.x, 0, moveDirection.y); // 下一个格子位置
-            Vector3 targetPos = new Vector3(nextGroundPos.x, entryPos.y, nextGroundPos.z); // 玩家目标位置
+                currentConveyor.transform.position + new Vector3(currentDir.x, 0, currentDir.y); // 下一个格子位置
+
+            Debug.Log("目标位置: " + targetPos);
 
             // 3. 平滑移动到当前目标点
             while (Vector3.Distance(player.transform.position, targetPos) > 0.01f)
