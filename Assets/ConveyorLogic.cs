@@ -37,7 +37,7 @@ public class ConveyorLogic : MonoBehaviour
         while (currentConveyor != null)
         {
             ConveyorLogic logic = currentConveyor.GetComponent<ConveyorLogic>();
-            if (logic == null || !logic.isActive)
+            if (logic == null || !logic.isActive || !logic.forwardPoint)
                 break;
 
             Debug.Log("当前传送带: " + currentConveyor.name);
@@ -51,22 +51,24 @@ public class ConveyorLogic : MonoBehaviour
             );
 
             // 2. 计算目标格子中心位置
-            // Vector3 forwardMoveDir = currentConveyor.transform.forward;
-            Vector3 forwardMoveDir = forwardPoint.position - currentConveyor.transform.position;
-            Debug.Log("1: " + forwardPoint.position + " 2: " + currentConveyor.transform.position);
+            Vector3 forwardMoveDir =
+                logic.forwardPoint.position - currentConveyor.transform.position;
+            Debug.Log(
+                "1: " + logic.forwardPoint.position + " 2: " + currentConveyor.transform.position
+            );
             forwardMoveDir.y = 0;
             forwardMoveDir.Normalize();
             // Vector2 currentDir = logic.moveDirection;
-            Vector2 currentDir = forwardMoveDir;
+            Vector3 currentDir = forwardMoveDir;
 
             Debug.Log("传送方向: " + currentDir + ", 前方: " + forwardMoveDir);
             Vector3 targetPos =
-                currentConveyor.transform.position
-                + new Vector3(currentDir.x, entryPos.y, currentDir.y); // 玩家目标位置
+                currentConveyor.transform.position + new Vector3(currentDir.x, 0, currentDir.z); // 玩家目标位置
+            targetPos.y = entryPos.y; // 保持原有高度
             Vector3 nextGroundPos =
-                currentConveyor.transform.position + new Vector3(currentDir.x, 0, currentDir.y); // 下一个格子位置
+                currentConveyor.transform.position + new Vector3(currentDir.x, 0, currentDir.z); // 下一个格子位置
 
-            Debug.Log("目标位置: " + targetPos);
+            Debug.Log("目标位置: " + targetPos + " 下一个格子位置: " + nextGroundPos);
 
             // 3. 平滑移动到当前目标点
             while (Vector3.Distance(player.transform.position, targetPos) > 0.01f)
@@ -81,15 +83,14 @@ public class ConveyorLogic : MonoBehaviour
             player.transform.position = targetPos;
 
             // 4. 寻找下一个接力的传送带
-            currentConveyor = GetNextConveyor(nextGroundPos);
+            GameObject nextConveyor = GetNextConveyor(nextGroundPos);
+            Debug.Log("下一个传送带: " + (nextConveyor ? nextConveyor.name : "无"));
+            currentConveyor = nextConveyor;
         }
 
         // 4. 传送链结束，释放控制权
         player.isControlLocked = false;
         player.isBeingTransported = false;
-
-        // 5. 最终位置检测
-        CheckForFall(player);
     }
 
     private GameObject GetNextConveyor(Vector3 pos)
@@ -104,13 +105,5 @@ public class ConveyorLogic : MonoBehaviour
             }
         }
         return null;
-    }
-
-    private void CheckForFall(Player player)
-    {
-        if (!Physics.Raycast(player.transform.position, Vector3.down, 1f))
-        {
-            Debug.Log("传送结束，触发掉落流程");
-        }
     }
 }
