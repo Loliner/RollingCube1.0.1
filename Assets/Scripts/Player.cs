@@ -15,6 +15,7 @@ public class Player : MonoBehaviour
     public bool isBeingTransported = false;
     Vector3 anchor;
     Vector3 axis;
+    private PushableBlock pushingBlock = null;
 
     // Update is called once per frame
     void Update()
@@ -51,8 +52,22 @@ public class Player : MonoBehaviour
     {
         Ray ray = new Ray(transform.position + new Vector3(0, -0.4f, 0), dir);
         RaycastHit hit;
-        if (Physics.Raycast(ray, out hit, 1.5f))
+        if (Physics.Raycast(ray, out hit, 1f))
         {
+            // Debug.Log(
+            //     "DetectCollision: "
+            //         + hit.collider.CompareTag("Pushable")
+            //         + hit.collider.GetComponent<PushableBlock>().CanBePushed(dir)
+            // );
+            if (
+                hit.collider.CompareTag("Pushable")
+                && hit.collider.GetComponent<PushableBlock>().CanBePushed(dir)
+            )
+            {
+                pushingBlock = hit.collider.GetComponent<PushableBlock>();
+                pushingBlock.PreparePush(dir, this);
+                return false;
+            }
             Debug.Log("Hit: " + hit.collider.name);
             return true;
         }
@@ -78,10 +93,7 @@ public class Player : MonoBehaviour
 
         if (this.rotateTotal >= 90)
         {
-            ResetPosition();
-            ResetRotate();
-            this._isMoving = false;
-            GetComponent<Rigidbody>().useGravity = true;
+            Reset();
         }
     }
 
@@ -89,6 +101,13 @@ public class Player : MonoBehaviour
     {
         ResetPosition();
         ResetRotate();
+        this._isMoving = false;
+        GetComponent<Rigidbody>().useGravity = true;
+        if (pushingBlock != null)
+        {
+            pushingBlock.PushFinished();
+            pushingBlock = null;
+        }
     }
 
     void ResetPosition()
