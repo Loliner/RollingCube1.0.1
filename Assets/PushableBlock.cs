@@ -44,8 +44,11 @@ public class PushableBlock : MonoBehaviour
     public void ShouldFall()
     {
         // 检查下方是否为空，为空则执行下面的掉落逻辑
-        bool hasGround = Physics.Raycast(transform.position, Vector3.down, 1.5f);
-        Debug.Log(gameObject.name + transform.position + "检查下方是否有物体 " + hasGround);
+        // terrain 的中心店都在顶部(0, 1, 0)，所以要减去 0.9
+        Ray ray = new Ray(transform.position + new Vector3(0, -0.9f, 0), Vector3.down);
+        RaycastHit hit;
+        bool hasGround = Physics.Raycast(ray, out hit, 0.25f);
+        Debug.Log(gameObject.name + "has ground:" + hasGround + "hit: " + hit.collider);
         if (!hasGround)
         {
             // 开启重力
