@@ -38,6 +38,28 @@ public class PushableBlock : MonoBehaviour
         isAttached = false;
         playerTransform = null;
         ResetPosition();
+        ShouldFall();
+    }
+
+    public void ShouldFall()
+    {
+        // 检查下方是否为空，为空则执行下面的掉落逻辑
+        bool hasGround = Physics.Raycast(transform.position, Vector3.down, 1.5f);
+        Debug.Log(gameObject.name + transform.position + "检查下方是否有物体 " + hasGround);
+        if (!hasGround)
+        {
+            // 开启重力
+            Rigidbody rb = GetComponent<Rigidbody>();
+            rb.useGravity = true;
+            rb.isKinematic = false; // 确保物理系统接管
+
+            // 调整碰撞体以进入填坑状态
+            BoxCollider boxCollider = GetComponent<BoxCollider>();
+            boxCollider.isTrigger = false;
+
+            // 设置略小于 1 的尺寸，防止掉落时与边缘摩擦过大
+            boxCollider.size = new Vector3(0.95f, 0.95f, 0.95f);
+        }
     }
 
     private void Update()
