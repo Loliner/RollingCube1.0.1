@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using DG.Tweening; // 必须导入 DOTween: https://dotween.demigiant.com/
 using UnityEngine;
 
@@ -13,18 +15,21 @@ public class CubeTeleporter : MonoBehaviour
     [SerializeField]
     private Transform targetPoint; // 传送目标点
 
-    [Header("动画参数")]
+    [Header("上浮动画参数")]
     [SerializeField]
-    private float duration = 0.5f; // 动画阶段耗时
+    private float floatHeight = 2.0f; // 上浮的高度
 
     [SerializeField]
-    private float reassembleDuration = 0.5f;
+    private float layerDelay = 0.2f; // 每一层之间的启动延迟
 
     [SerializeField]
-    private float explosionScale = 2.5f; // 碎块炸开的距离倍数
+    private float pieceRandomDelay = 0.15f; // 同一层内碎片的随机延迟范围
 
     [SerializeField]
-    private float rotateAmount = 180f; // 碎块旋转的角度
+    private float disassemblePieceDuration = 0.8f; // 散开时每个碎片时长
+
+    [SerializeField]
+    private float reassemblePieceDuration = 0.8f; // 组装时每个碎片时长
 
     private bool isTeleporting = false;
 
@@ -47,91 +52,171 @@ public class CubeTeleporter : MonoBehaviour
     {
         if (isTeleporting || targetPoint == null)
             return;
-        Debug.Log("StartTeleport");
         isTeleporting = true;
-
-        // 1. 隐藏本体
         cubeModel.SetActive(false);
 
-        // 2. 播散开动画
-        PlayShatterEffect();
+        PlayFloatingShatter();
 
-        // 3. 移动逻辑中心并延迟播汇聚动画
+        // 计算总等待时间：(2层延迟) + 单个动画时长
+        float totalWaitTime = (layerDelay * 2) + disassemblePieceDuration;
+
         DOVirtual.DelayedCall(
-            duration,
+            totalWaitTime * 0.8f,
             () =>
             {
-                // 瞬间移动父物体到目标点
                 transform.position = targetPoint.position;
-
-                // 4. 执行汇聚动画
-                PlayReassembleEffect();
+                PlayRisingReassemble();
             }
         );
     }
 
-    private void PlayShatterEffect()
+    private void PlayFloatingShatter()
     {
-        // 在当前位置生成碎块
+        // 1. 生成碎块预制体
         GameObject debris = Instantiate(debrisPrefab, transform.position, transform.rotation);
 
+        // 2. 将所有子碎块提取到 List 中
+        List<Transform> pieces = new List<Transform>();
         foreach (Transform child in debris.transform)
         {
-            // 计算炸开方向：基于碎块在方块中的相对位置，使其向外扩散
-            // 如果碎块在中心，则给一个随机方向
-            Vector3 direction = child.localPosition.normalized;
-            if (direction == Vector3.zero)
-                direction = Random.insideUnitSphere.normalized;
-
-            Vector3 targetPos = child.localPosition + direction * explosionScale;
-
-            // 动画：位移 + 随机旋转 + 缩放归零
-            child.DOLocalMove(targetPos, duration).SetEase(Ease.OutCubic);
-            child.DOLocalRotate(
-                new Vector3(Random.value, Random.value, Random.value) * rotateAmount,
-                duration
-            );
-            child.DOScale(Vector3.zero, duration).SetEase(Ease.InQuad);
+            pieces.Add(child);
         }
 
-        // 0.6秒后销毁这组碎块（留一点余量确保动画播完）
-        Destroy(debris, duration + 0.1f);
+        // 3. 核心分层逻辑：按世界 Y 坐标分组 (精度 0.1)
+        // OrderByDescending 确保 Y 值最大的（最顶层）排在 List 前面，先开始动画
+        var layers = pieces
+            .GroupBy(p => Mathf.Round(p.position.y * 10f) / 10f)
+            .OrderByDescending(g => g.Key)
+            .ToList();
+
+        Debug.Log($"[Teleport] 成功识别到 {layers.Count} 层碎块。");
+
+        // 4. 遍历每一层执行动画
+        for (int i = 0; i < layers.Count; i++)
+        {
+            // 每一层的基础延迟时间
+            float baseLayerDelay = i * layerDelay;
+
+            foreach (Transform child in layers[i])
+            {
+                // 同一层内的碎片随机错开一点启动时间，增加灵动感
+                float finalDelay = baseLayerDelay + Random.Range(0f, pieceRandomDelay);
+
+                // --- A. 垂直上浮 ---
+                // 使用 DOMove (世界坐标) 配合 Vector3.up 确保绝对垂直向上
+                Vector3 targetWorldPos = child.position + Vector3.up * floatHeight;
+                child
+                    .DOMove(targetWorldPos, disassemblePieceDuration)
+                    .SetDelay(finalDelay)
+                    .SetEase(Ease.OutBack);
+
+                // --- B. 随机倾斜旋转 ---
+                // 产生前后或左右的轻微倾斜，而不是大幅度自旋
+                // X 和 Z 轴控制倾斜方向，Y 轴给极少量的偏移
+                Vector3 tiltRotation = new Vector3(
+                    Random.Range(-35f, 35f), // 前后倾斜角度
+                    Random.Range(-10f, 10f), // 极轻微自旋
+                    Random.Range(-35f, 35f) // 左右倾斜角度
+                );
+
+                child
+                    .DORotate(tiltRotation, disassemblePieceDuration, RotateMode.LocalAxisAdd)
+                    .SetDelay(finalDelay)
+                    .SetEase(Ease.OutSine);
+
+                // --- C. 逐步缩小 ---
+                child
+                    .DOScale(Vector3.zero, disassemblePieceDuration)
+                    .SetDelay(finalDelay)
+                    .SetEase(Ease.OutSine);
+            }
+        }
+
+        // 5. 自动清理：在所有层动画结束后销毁碎片对象
+        float maxAnimTime = (layers.Count * layerDelay) + disassemblePieceDuration;
+        Destroy(debris, maxAnimTime + 1f);
     }
 
-    private void PlayReassembleEffect()
+    private void PlayRisingReassemble()
     {
-        // 在目标点生成另一组碎块
+        // 1. 在目标位置生成碎块预制体
         GameObject debris = Instantiate(debrisPrefab, transform.position, transform.rotation);
 
+        // 2. 将所有子碎块提取到 List 中
+        List<Transform> pieces = new List<Transform>();
         foreach (Transform child in debris.transform)
         {
-            // 记录原始的合体位置
-            Vector3 finalLocalPos = child.localPosition;
-
-            // 初始状态：拉远、缩放为0、随机角度
-            child.localPosition = finalLocalPos * 3f;
-            child.localScale = Vector3.zero;
-            child.localRotation = Quaternion.Euler(
-                Random.Range(0, 360),
-                Random.Range(0, 360),
-                Random.Range(0, 360)
-            );
-
-            // 动画：向原始位置汇聚 + 放大 + 旋转归零
-            child.DOLocalMove(finalLocalPos, reassembleDuration).SetEase(Ease.Unset);
-            child.DOScale(Vector3.one, reassembleDuration).SetEase(Ease.Unset);
-            child.DOLocalRotate(Vector3.zero, reassembleDuration).SetEase(Ease.Unset);
+            pieces.Add(child);
         }
 
-        // 汇聚完成后显示本体
+        // 3. 核心分层逻辑：按世界 Y 坐标分组
+        // 使用 OrderBy(g => g.Key) 确保 Y 值最小的（最底层）排在前面，先开始动画
+        var layers = pieces
+            .GroupBy(p => Mathf.Round(p.position.y * 10f) / 10f)
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        Debug.Log($"[Teleport] 汇聚动画：成功识别到 {layers.Count} 层碎块。");
+
+        // 4. 遍历每一层执行“反向”动画
+        for (int i = 0; i < layers.Count; i++)
+        {
+            // 每一层的基础延迟时间
+            float baseLayerDelay = i * layerDelay;
+
+            foreach (Transform child in layers[i])
+            {
+                // 记录该碎块最终应该达到的完美位置和旋转
+                Vector3 finalWorldPos = child.position;
+                Quaternion finalRotation = child.rotation;
+
+                // --- A. 设置初始状态 (动画开始前) ---
+                // 碎片从上方 floatHeight 处“降落”回来
+                child.position = finalWorldPos + Vector3.up * floatHeight;
+                // 初始大小为 0
+                child.localScale = Vector3.zero;
+                // 初始随机倾斜角度
+                child.localRotation = Quaternion.Euler(
+                    Random.Range(-35f, 35f),
+                    Random.Range(-10f, 10f),
+                    Random.Range(-35f, 35f)
+                );
+
+                // 同一层内的碎片随机错开
+                float finalDelay = baseLayerDelay + Random.Range(0f, pieceRandomDelay);
+
+                // --- B. 执行汇聚动画 ---
+
+                // 1. 垂直降落回原位
+                child
+                    .DOMove(finalWorldPos, reassemblePieceDuration)
+                    .SetDelay(finalDelay)
+                    .SetEase(Ease.OutBack); // 使用 OutBack 产生轻微的回弹感，增加弹性
+
+                // 2. 旋转归零 (回到完美方块的角度)
+                child
+                    .DORotateQuaternion(finalRotation, reassemblePieceDuration)
+                    .SetDelay(finalDelay)
+                    .SetEase(Ease.OutSine);
+
+                // 3. 逐步放大
+                child
+                    .DOScale(Vector3.one, reassemblePieceDuration)
+                    .SetDelay(finalDelay)
+                    .SetEase(Ease.OutSine);
+            }
+        }
+
+        // 5. 动画结束后恢复主体，并清理碎块
+        float maxAnimTime = (layers.Count * layerDelay) + reassemblePieceDuration;
         DOVirtual.DelayedCall(
-            reassembleDuration,
+            maxAnimTime,
             () =>
             {
                 cubeModel.transform.position = targetPoint.transform.position;
                 cubeModel.SetActive(true);
                 Destroy(debris);
-                isTeleporting = false;
+                isTeleporting = false; // 重置状态锁
             }
         );
     }
