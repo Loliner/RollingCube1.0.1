@@ -97,10 +97,24 @@ public class CubeTeleporter : MonoBehaviour
             // 每一层的基础延迟时间
             float baseLayerDelay = i * layerDelay;
 
-            foreach (Transform child in layers[i])
+            // 1. 将当前层的碎片转为列表并随机打乱顺序
+            // 这样可以保证空间位置上的碎片起飞顺序是随机的
+            List<Transform> currentLayerPieces = layers[i].ToList();
+            ShuffleList(currentLayerPieces);
+
+            int pieceCount = currentLayerPieces.Count;
+            // 计算每个碎片的平均时间间隔
+            float interval = pieceRandomDelay / pieceCount;
+
+            for (int j = 0; j < pieceCount; j++)
             {
-                // 同一层内的碎片随机错开一点启动时间，增加灵动感
-                float finalDelay = baseLayerDelay + Random.Range(0f, pieceRandomDelay);
+                Transform child = currentLayerPieces[j];
+
+                // 2. 核心算法：均匀分布 + 微小抖动 (Jitter)
+                // j * interval 保证了它们在时间上是排队开来的
+                // Random.Range 则在小范围内让这种排队不那么死板
+                float jitter = Random.Range(0f, interval * 0.5f);
+                float finalDelay = baseLayerDelay + (j * interval) + jitter;
 
                 // --- A. 垂直上浮 ---
                 // 使用 DOMove (世界坐标) 配合 Vector3.up 确保绝对垂直向上
@@ -135,6 +149,18 @@ public class CubeTeleporter : MonoBehaviour
         // 5. 自动清理：在所有层动画结束后销毁碎片对象
         float maxAnimTime = (layers.Count * layerDelay) + disassemblePieceDuration;
         Destroy(debris, maxAnimTime + 1f);
+    }
+
+    // 一个简单的洗牌算法 (Fisher-Yates Shuffle)
+    private void ShuffleList<T>(List<T> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int rnd = Random.Range(0, i + 1);
+            T temp = list[i];
+            list[i] = list[rnd];
+            list[rnd] = temp;
+        }
     }
 
     private void PlayRisingReassemble()
@@ -208,7 +234,7 @@ public class CubeTeleporter : MonoBehaviour
         }
 
         // 5. 动画结束后恢复主体，并清理碎块
-        float maxAnimTime = (layers.Count * layerDelay) + reassemblePieceDuration;
+        float maxAnimTime = (layers.Count * layerDelay) + reassemblePieceDuration + 1f;
         DOVirtual.DelayedCall(
             maxAnimTime,
             () =>

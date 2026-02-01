@@ -40,7 +40,11 @@ public class Player : MonoBehaviour
             return;
         // stop rotate if encounter barrier
         if (DetectCollision(dir))
+        {
+            StartCoroutine(ShakeRandom(0.15f, 0.05f));
             return;
+        }
+
         this._isMoving = true;
         GetComponent<Rigidbody>().useGravity = false;
         this.rotateTotal = 0;
@@ -72,6 +76,39 @@ public class Player : MonoBehaviour
             return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// 随机震动效果
+    /// </summary>
+    /// <param name="duration">持续时间</param>
+    /// <param name="magnitude">震动幅度</param>
+    IEnumerator ShakeRandom(float duration = 0.15f, float magnitude = 0.05f)
+    {
+        this.isControlLocked = true;
+        GetComponent<Rigidbody>().useGravity = false;
+        GetComponent<BoxCollider>().enabled = false;
+        Vector3 originalPos = transform.localPosition;
+        float elapsed = 0.0f;
+
+        while (elapsed < duration)
+        {
+            // 在一个小球体内随机取点作为偏移量
+            Vector3 randomOffset = Random.insideUnitSphere * magnitude;
+            // 保持 Y 轴不动（可选，防止方块陷进地面）
+            randomOffset.y = 0;
+            transform.localPosition = originalPos + randomOffset;
+
+            elapsed += Time.deltaTime;
+            yield return null; // 等待下一帧
+        }
+
+        // 恢复原始位置
+        transform.localPosition = originalPos;
+        Reset();
+        GetComponent<Rigidbody>().useGravity = true;
+        GetComponent<BoxCollider>().enabled = true;
+        this.isControlLocked = false;
     }
 
     void Rotate()
