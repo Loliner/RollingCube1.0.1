@@ -43,7 +43,7 @@ Material:
     - _QueueOffset: 0
     - _Transition_Smoothness: 0.5
     m_Colors:
-    - _BottomColor: {r: 0, g: 0.4745098, b: 0.8862745, a: 0}
+    - _BottomColor: {r: 0.56181026, g: 0.9528302, b: 0.758983, a: 0}
     - _HorizonColor: {r: 0.99607843, g: 0.99607843, b: 0.7490196, a: 0}
     - _TopColor: {r: 1, g: 0.043137256, b: 0.1764706, a: 0}
   m_BuildTextureStacks: []
