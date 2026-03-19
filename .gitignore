@@ -52,4 +52,4 @@ crashlytics-build.properties
 .DS_Store
 
 # 这里的排除项是为了保留某些特殊的文件夹（如果需要）
-!/[Aa]ssets/**/*.meta
+!/[Aa]ssets/**/*.meta.mcp.json
